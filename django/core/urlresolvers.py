@@ -33,6 +33,11 @@ _prefixes = local()
 # Overridden URLconfs for each thread are stored here.
 _urlconfs = local()
 
+USE_RE_COMPILE = True
+
+if USE_RE_COMPILE:
+    COMPILED_REGEXP = {}
+
 
 class ResolverMatch(object):
     def __init__(self, func, args, kwargs, url_name=None, app_name=None, namespaces=None):
@@ -445,7 +450,19 @@ class RegexURLResolver(LocaleRegexProvider):
                 # Then, if we have a match, redo the substitution with quoted
                 # arguments in order to return a properly encoded URL.
                 candidate_pat = prefix_norm.replace('%', '%%') + result
-                if re.search('^%s%s' % (prefix_norm, pattern), candidate_pat % candidate_subs, re.UNICODE):
+                if USE_RE_COMPILE:
+                    regexp = '^%s%s' % (prefix_norm, pattern)
+                    try:
+                        compiled_regex = COMPILED_REGEXP[regexp]
+                    except KeyError:
+                        compiled_regex = COMPILED_REGEXP[regexp] = re.compile(regexp, re.UNICODE)
+                    match = compiled_regex.search(candidate_pat % candidate_subs)
+                else:
+                    match = re.search(
+                        '^%s%s' % (prefix_norm, pattern),
+                        candidate_pat % candidate_subs, re.UNICODE
+                    )
+                if match:
                     candidate_subs = dict((k, urlquote(v)) for (k, v) in candidate_subs.items())
                     url = candidate_pat % candidate_subs
                     # Don't allow construction of scheme relative urls.
